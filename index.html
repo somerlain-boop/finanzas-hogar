@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Gastos Compartidos</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js y Datalabels -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .dark .glass-card {
+            background: rgba(31, 41, 55, 0.7);
+            border: 1px solid rgba(75, 85, 99, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+        }
+
+        input {
+            transition: all 0.2s ease;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+            animation-fill-mode: both;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
+
+    <nav class="sticky top-0 z-50 glass-card shadow-sm mb-8">
+        <div class="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-brand-500 text-white p-2 rounded-lg shadow-lg shadow-brand-500/30">
+                        <i class="fa-solid fa-wallet text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold tracking-tight">Finanzas<span class="text-brand-500">Hogar</span></h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="cloudStatus" class="text-xs font-semibold px-2 py-1 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Cargando...
+                    </span>
+                    <button id="themeToggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-moon text-xl text-slate-600 dark:text-slate-300" id="themeIcon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        
+        <!-- Fila Superior: Formulario y Liquidación -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-8">
+            
+            <!-- Formulario de Ingreso -->
+            <div class="lg:col-span-2 xl:col-span-3 glass-card rounded-2xl shadow-xl p-6 fade-in">
+                <h2 class="text-lg font-semibold mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-3 dark:border-slate-700 gap-3">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-file-invoice-dollar text-brand-500"></i> Registro del Mes</span>
+                    <button onclick="openHistoricalModal()" class="text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm font-medium whitespace-nowrap w-full sm:w-auto justify-center">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Añadir Historial Antiguo
+                    </button>
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-1 opacity-80">Mes a registrar</label>
+                    <input type="month" id="inputMonth" class="w-full md:w-1/3 rounded-xl border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none">
+                </div>
+
+                <!-- Tabla de Recibos (Estilo Excel) -->
+                <div class="overflow-x-auto mb-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                    <table class="w-full text-left border-collapse min-w-[750px]">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-600 text-sm font-semibold opacity-90">
+                                <th class="py-3 px-4 text-center w-24">Fecha límite</th>
+                                <th class="py-3 px-4">Recibo</th>
+                                <th class="py-3 px-4 w-40">Valor</th>
+                                <th class="py-3 px-4 w-48">Código para pago</th>
+                                <th class="py-3 px-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Gas -->
+                            <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-bold text-xs shadow-sm">18</span>
+                                </td>
+                                <td class="py-3 px-4 font-medium flex items-center gap-2">
+                                    <i class="fa-solid fa-fire text-orange-500 w-5 text-center"></i> Gas
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                                        <input type="text" inputmode="numeric" id="valGas" class="expense-input format-number w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-7 pr-2 py-1.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm transition-all" placeholder="0">
+                                        <span id="warn-valGas" class="absolute -bottom-3.5 left-0 text-[10px] text-rose-500 hidden font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Consumo alto</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="font-mono text-sm tracking-tight">63803183</span>
+                                        <button onclick="copyCode('63803183')" class="text-slate-400 hover:text-brand-500 transition-colors" title="Copiar código">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <a href="https://www.grupovanti.com/paga-tu-factura-b2b" target="_blank" onclick="playClick()" class="inline-flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm w-full"><i class="fa-solid fa-arrow-up-right-from-square"></i> Pagar</a>
+                                </td>
+                            </tr>
+
+                            <!-- Internet -->
+                            <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold text-xs shadow-sm">16</span>
+                                </td>
+                                <td class="py-3 px-4 font-medium flex items-center gap-2">
+                                    <i class="fa-solid fa-wifi text-blue-500 w-5 text-center"></i> Internet
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                                        <input type="text" inputmode="numeric" id="valInternet" class="expense-input format-number w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-7 pr-2 py-1.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm transition-all" placeholder="0">
+                                        <span id="warn-valInternet" class="absolute -bottom-3.5 left-0 text-[10px] text-rose-500 hidden font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Consumo alto</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="font-mono text-sm tracking-tight">28438579</span>
+                                        <button onclick="copyCode('28438579')" class="text-slate-400 hover:text-brand-500 transition-colors" title="Copiar código">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <a href="https://portalpagos.claro.com.co/index.php?view=vistas/personal/claro/newclaro/inicio.php&id_objeto=10002#no-back-button" target="_blank" onclick="playClick()" class="inline-flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm w-full"><i class="fa-solid fa-arrow-up-right-from-square"></i> Pagar</a>
+                                </td>
+                            </tr>
+
+                            <!-- Agua -->
+                            <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 font-bold text-xs shadow-sm">29</span>
+                                </td>
+                                <td class="py-3 px-4 font-medium flex items-center gap-2">
+                                    <i class="fa-solid fa-droplet text-cyan-500 w-5 text-center"></i> Agua
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                                        <input type="text" inputmode="numeric" id="valAgua" class="expense-input format-number w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-7 pr-2 py-1.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm transition-all" placeholder="0">
+                                        <span id="warn-valAgua" class="absolute -bottom-3.5 left-0 text-[10px] text-rose-500 hidden font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Consumo alto</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="font-mono text-sm tracking-tight">1322193</span>
+                                        <button onclick="copyCode('1322193')" class="text-slate-400 hover:text-brand-500 transition-colors" title="Copiar código">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <a href="https://www.amb.com.co/amb/" target="_blank" onclick="playClick()" class="inline-flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm w-full"><i class="fa-solid fa-arrow-up-right-from-square"></i> Pagar</a>
+                                </td>
+                            </tr>
+
+                            <!-- Luz -->
+                            <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-bold text-xs shadow-sm">19</span>
+                                </td>
+                                <td class="py-3 px-4 font-medium flex items-center gap-2">
+                                    <i class="fa-solid fa-lightbulb text-yellow-500 w-5 text-center"></i> Luz
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                                        <input type="text" inputmode="numeric" id="valLuz" class="expense-input format-number w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-7 pr-2 py-1.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm transition-all" placeholder="0">
+                                        <span id="warn-valLuz" class="absolute -bottom-3.5 left-0 text-[10px] text-rose-500 hidden font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Consumo alto</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="font-mono text-sm tracking-tight">1747840</span>
+                                        <button onclick="copyCode('1747840')" class="text-slate-400 hover:text-brand-500 transition-colors" title="Copiar código">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <a href="https://www.essa.com.co/site/mi-factura/consulta-y-descarga-tu-factura" target="_blank" onclick="playClick()" class="inline-flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm w-full"><i class="fa-solid fa-arrow-up-right-from-square"></i> Pagar</a>
+                                </td>
+                            </tr>
+
+                            <!-- Administración -->
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 font-bold text-xs shadow-sm">21</span>
+                                </td>
+                                <td class="py-3 px-4 font-medium flex items-center gap-2">
+                                    <i class="fa-solid fa-building text-purple-500 w-5 text-center"></i> Administración
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                                        <input type="text" inputmode="numeric" id="valAdmin" class="expense-input format-number w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-7 pr-2 py-1.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm transition-all" placeholder="0">
+                                        <span id="warn-valAdmin" class="absolute -bottom-3.5 left-0 text-[10px] text-rose-500 hidden font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Consumo alto</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-4">
+                                    <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <span class="font-mono text-sm tracking-tight">1102</span>
+                                        <button onclick="copyCode('1102')" class="text-slate-400 hover:text-brand-500 transition-colors" title="Copiar código">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <a href="https://www.avalpaycenter.com/wps/portal/portal-de-pagos/web/pagos-aval/resultado-busqueda/realizar-pago?idConv=00023270&origen=buscar" target="_blank" onclick="playClick()" class="inline-flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm w-full"><i class="fa-solid fa-arrow-up-right-from-square"></i> Pagar</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="border-t dark:border-slate-700 pt-5 flex flex-col md:flex-row gap-6">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1 opacity-80 text-brand-600 dark:text-brand-400">
+                            <i class="fa-solid fa-hand-holding-dollar"></i> Saldo a favor
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <input type="text" inputmode="numeric" id="valSister" class="expense-input format-number w-full rounded-xl border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-900/20 pl-8 pr-4 py-2.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1 opacity-80">
+                            <i class="fa-solid fa-link"></i> Enlace de Evidencia (Opcional)
+                        </label>
+                        <div class="relative">
+                            <input type="url" id="valEvidence" class="w-full rounded-xl border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 shadow-sm focus:border-brand-500 focus:ring-brand-500 outline-none text-sm" placeholder="Pegar URL de Drive o Fotos">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen y Cálculos -->
+            <div class="glass-card rounded-2xl shadow-xl p-6 flex flex-col justify-between fade-in" style="animation-delay: 0.1s;">
+                <div>
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2 border-b pb-3 dark:border-slate-700">
+                        <i class="fa-solid fa-calculator text-brand-500"></i> Liquidación
+                    </h2>
+                    
+                    <!-- Gráfica Dona -->
+                    <div class="w-full h-[140px] mb-5 relative flex justify-center">
+                        <canvas id="donutChart"></canvas>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
+                            <span class="text-sm opacity-80 font-medium">Total Recibos</span>
+                            <div class="text-right flex items-center gap-2">
+                                <div id="compBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-500 hidden items-center gap-1 transition-all">
+                                    --
+                                </div>
+                                <span class="font-bold text-lg" id="lblTotal">$0</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center p-2">
+                            <span class="text-sm opacity-80">Cuota Zulma (50% + 65k Luz)</span>
+                            <span class="font-semibold text-brand-600 dark:text-brand-400" id="lblShare">$0</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2">
+                            <span class="text-sm opacity-80">Saldo a favor</span>
+                            <span class="font-semibold text-emerald-600 dark:text-emerald-400" id="lblSisterPaid">$0</span>
+                        </div>
+                        
+                        <div class="h-px bg-slate-200 dark:bg-slate-700 my-2"></div>
+                        
+                        <div id="balanceContainer" class="p-4 rounded-xl text-center bg-slate-100 dark:bg-slate-800 transition-colors shadow-inner">
+                            <p class="text-xs uppercase tracking-wider font-semibold opacity-70 mb-1">Estado de Cuentas</p>
+                            <p class="text-lg font-bold" id="lblBalanceStatus">Sin Datos</p>
+                            <p class="text-2xl font-black mt-1 text-slate-500" id="lblBalanceAmount">$0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-3">
+                    <button id="btnClear" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3 rounded-xl transition-all w-16 flex justify-center items-center gap-2 shadow-sm" title="Limpiar Formulario">
+                        <i class="fa-solid fa-broom"></i>
+                    </button>
+                    <button id="btnSave" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/30 transition-all transform active:scale-95 flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Mes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fila Inferior: Gráficas y Tablas Históricas (SECCIÓN REPARADA) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 fade-in" style="animation-delay: 0.2s;">
+            
+            <!-- Gráfica de barras Histórica -->
+            <div class="glass-card rounded-2xl shadow-xl p-6">
+                <div class="flex justify-between items-center mb-6 border-b pb-3 dark:border-slate-700">
+                    <h2 class="text-lg font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-brand-500"></i> Gastos Mensuales
+                    </h2>
+                    <div class="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                        <button onclick="changeYear(-1)" class="w-8 h-8 rounded-md hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all text-slate-600 dark:text-slate-300"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="chartYearDisplay" class="font-bold text-slate-700 dark:text-slate-200 min-w-[3rem] text-center">2026</span>
+                        <button onclick="changeYear(1)" class="w-8 h-8 rounded-md hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all text-slate-600 dark:text-slate-300"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="w-full h-[350px] relative">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabla de Historial -->
+            <div class="glass-card rounded-2xl shadow-xl p-6 flex flex-col">
+                <h2 class="text-lg font-semibold mb-6 flex items-center gap-2 border-b pb-3 dark:border-slate-700">
+                    <i class="fa-solid fa-clock-rotate-left text-brand-500"></i> Historial de Pagos
+                </h2>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner flex-1 max-h-[350px] overflow-y-auto bg-white dark:bg-slate-900/50">
+                    <table class="w-full text-left border-collapse min-w-[400px]">
+                        <thead class="sticky top-0 bg-slate-100 dark:bg-slate-800 shadow-sm z-10">
+                            <tr class="border-b border-slate-300 dark:border-slate-600 text-sm font-semibold opacity-90">
+                                <th class="py-3 px-4">Mes</th>
+                                <th class="py-3 px-4">Total Pagado</th>
+                                <th class="py-3 px-4 w-24 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <!-- Datos inyectados por JS -->
+                        </tbody>
+                    </table>
+                    <div id="emptyState" class="p-8 text-center text-slate-500 dark:text-slate-400">
+                        <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fa-solid fa-folder-open text-2xl opacity-50"></i>
+                        </div>
+                        <p class="text-sm font-medium">No hay registros guardados aún.</p>
+                        <p class="text-xs mt-1 opacity-70">Guarda un mes para ver tu historial aquí.</p>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- Notificación emergente -->
+        <div id="toast" class="fixed bottom-4 right-4 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-3 font-medium">
+            <i class="fa-solid fa-circle-check"></i>
+            <span id="toastMsg">Registro guardado con éxito</span>
+        </div>
+
+        <!-- Modal Histórico -->
+        <div id="historicalModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center opacity-0 transition-opacity">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-md transform scale-95 transition-transform duration-300" id="historicalModalContent">
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2 border-b pb-3 dark:border-slate-700"><i class="fa-solid fa-clock-rotate-left text-brand-500"></i> Añadir Mes Anterior</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Mes a registrar</label>
+                        <input type="month" id="histMonth" class="w-full rounded-xl border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 outline-none focus:border-brand-500 focus:ring-brand-500 shadow-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Total Pagado en Recibos</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <input type="text" inputmode="numeric" id="histTotal" class="w-full rounded-xl border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 pl-8 pr-4 py-2.5 outline-none focus:border-brand-500 focus:ring-brand-500 shadow-sm transition-colors format-number" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-emerald-600 dark:text-emerald-400">Saldo a favor (Opcional)</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <input type="text" inputmode="numeric" id="histSister" class="w-full rounded-xl border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 pl-8 pr-4 py-2.5 outline-none focus:border-brand-500 focus:ring-brand-500 shadow-sm transition-colors format-number" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="bg-brand-50 dark:bg-brand-900/20 p-3 rounded-lg text-sm text-brand-800 dark:text-brand-300 flex gap-2 items-start mt-2 border border-brand-100 dark:border-brand-800/50">
+                        <i class="fa-solid fa-circle-info mt-0.5"></i> 
+                        <p>Para registros históricos sin el desglose de cada recibo. Se mostrarán como una sola barra gris en la gráfica.</p>
+                    </div>
+                </div>
+                <div class="mt-8 flex gap-3">
+                    <button onclick="closeHistoricalModal()" class="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2.5 rounded-xl transition-colors">Cancelar</button>
+                    <button onclick="saveHistorical()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-lg shadow-brand-500/30">Guardar Historial</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmar Borrado -->
+        <div id="deleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center opacity-0 transition-opacity">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm transform scale-95 transition-transform duration-300" id="deleteModalContent">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-500 mx-auto flex items-center justify-center text-3xl mb-4 shadow-inner">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">¿Eliminar Registro?</h3>
+                    <p class="text-sm opacity-80 text-slate-600 dark:text-slate-400">Esta acción no se puede deshacer. Los datos desaparecerán de tu historial.</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2.5 rounded-xl transition-colors">Cancelar</button>
+                    <button onclick="confirmDelete()" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-lg shadow-rose-500/30">Sí, eliminar</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Registrar plugin de Datalabels
+        Chart.register(ChartDataLabels);
+
+        // --- Estado de la Aplicación ---
+        let currentChartYear = new Date().getFullYear();
+        let historyData = [];
+        let chartInstance = null;
+        let donutChartInstance = null;
+        let recordToDeleteId = null;
+        
+        // --- Fallback a LocalStorage Seguro ---
+        const localDataKey = 'finanzas_hogar_v2';
+        let isFirebaseActive = false;
+        let db = null;
+        let userId = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finanzas-hogar';
+
+        const cloudBadge = document.getElementById('cloudStatus');
+
+        function setCloudStatus(isCloud) {
+            if(isCloud) {
+                cloudBadge.innerHTML = '<i class="fa-solid fa-cloud text-brand-500"></i> Nube Activa';
+                cloudBadge.classList.replace('bg-slate-200', 'bg-brand-50'); cloudBadge.classList.replace('text-slate-600', 'text-brand-700');
+                cloudBadge.classList.replace('dark:bg-slate-700', 'dark:bg-brand-900/30'); cloudBadge.classList.replace('dark:text-slate-300', 'dark:text-brand-300');
+            } else {
+                cloudBadge.innerHTML = '<i class="fa-solid fa-hard-drive text-emerald-500"></i> Guardado Local';
+                cloudBadge.classList.replace('bg-slate-200', 'bg-emerald-50'); cloudBadge.classList.replace('text-slate-600', 'text-emerald-700');
+                cloudBadge.classList.replace('dark:bg-slate-700', 'dark:bg-emerald-900/30'); cloudBadge.classList.replace('dark:text-slate-300', 'dark:text-emerald-300');
+            }
+        }
+
+        async function initAuth() {
+            try {
+                // Si la configuración no existe en la plataforma, fallamos hacia LocalStorage para evitar el crash.
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+                if (Object.keys(firebaseConfig).length === 0) throw new Error("Sin configuración Firebase");
+
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid;
+                if (userId) {
+                    isFirebaseActive = true;
+                    setCloudStatus(true);
+                    loadDataFromFirebase();
+                }
+            } catch(e) { 
+                console.warn("Modo Nube desactivado, usando almacenamiento local seguro.", e.message);
+                isFirebaseActive = false;
+                setCloudStatus(false);
+                loadDataFromLocal();
+            }
+        }
+
+        function loadDataFromFirebase() {
+            const q = query(collection(db, 'artifacts', appId, 'users', userId, 'months'));
+            onSnapshot(q, (snapshot) => {
+                historyData = [];
+                snapshot.forEach(document => {
+                    historyData.push({ id: document.id, ...document.data() });
+                });
+                renderChart(); renderTable(); calculateTotals(); 
+            }, (error) => console.error("Error Firebase:", error));
+        }
+
+        function loadDataFromLocal() {
+            const stored = localStorage.getItem(localDataKey);
+            if (stored) {
+                try { historyData = JSON.parse(stored); } catch(e) { historyData = []; }
+            } else { historyData = []; }
+            renderChart(); renderTable(); calculateTotals();
+        }
+
+        function saveToLocal() {
+            localStorage.setItem(localDataKey, JSON.stringify(historyData));
+            loadDataFromLocal();
+        }
+
+        initAuth();
+
+        // --- Sonidos Web Audio API ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration, vol=0.05) {
+            try {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + duration);
+            } catch(e) { }
+        }
+        window.playClick = () => playTone(600, 'sine', 0.1, 0.05);
+        window.playSuccess = () => { playTone(440, 'sine', 0.1, 0.05); setTimeout(() => playTone(660, 'sine', 0.15, 0.05), 100); };
+
+        // --- Utilidades ---
+        const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
+        const getNumber = (id) => { const val = document.getElementById(id).value; if(!val) return 0; return parseFloat(val.replace(/\./g, '')) || 0; };
+
+        // Auto-formateo con puntos de mil
+        document.addEventListener('input', function (e) {
+            if (e.target.classList.contains('format-number')) {
+                let value = e.target.value.replace(/\D/g, "");
+                if (value === "") { e.target.value = ""; if(e.target.classList.contains('expense-input')) calculateTotals(); return; }
+                e.target.value = new Intl.NumberFormat('es-CO').format(parseInt(value, 10));
+                if(e.target.classList.contains('expense-input')) calculateTotals();
+            }
+        });
+
+        const showToast = (msg) => {
+            const toast = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0'); setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        };
+
+        window.copyCode = (text) => {
+            navigator.clipboard.writeText(text).then(() => { showToast(`Código copiado`); window.playClick(); }).catch(()=>{});
+        };
+
+        // --- Alertas y Comparativas ---
+        function checkWarnings() {
+            if(historyData.length === 0) return;
+            ['Gas', 'Internet', 'Agua', 'Luz', 'Admin'].forEach(type => {
+                const val = getNumber('val' + type); const warnEl = document.getElementById('warn-val' + type);
+                if(warnEl) {
+                    if(val > 0) {
+                        const key = type.toLowerCase();
+                        const pastVals = historyData.filter(d => !d.isLegacy && d[key] > 0).map(d => d[key]);
+                        if(pastVals.length > 0) {
+                            const avg = pastVals.reduce((a,b) => a+b, 0) / pastVals.length;
+                            if(val > avg * 1.3) { warnEl.classList.remove('hidden'); return; }
+                        }
+                    }
+                    warnEl.classList.add('hidden');
+                }
+            });
+        }
+
+        function updateDonutChart(vanti, internet, agua, luz, admin) {
+            const ctx = document.getElementById('donutChart'); if(!ctx) return;
+            const data = [vanti, internet, agua, luz, admin]; const hasData = data.some(v => v > 0);
+            
+            if(!donutChartInstance) {
+                donutChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels: ['Gas', 'Internet', 'Agua', 'Luz', 'Admin'], datasets: [{ data: hasData ? data : [1], backgroundColor: hasData ? ['#f97316', '#3b82f6', '#06b6d4', '#eab308', '#a855f7'] : ['#e2e8f0'], borderWidth: 0 }] },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false }, tooltip: { enabled: hasData }, datalabels: { display: false } } }
+                });
+            } else {
+                donutChartInstance.data.datasets[0].data = hasData ? data : [1];
+                donutChartInstance.data.datasets[0].backgroundColor = hasData ? ['#f97316', '#3b82f6', '#06b6d4', '#eab308', '#a855f7'] : ['#e2e8f0'];
+                donutChartInstance.options.plugins.tooltip.enabled = hasData; donutChartInstance.update();
+            }
+        }
+
+        function updateComparison(currentTotal, monthStr) {
+            const compBadge = document.getElementById('compBadge'); if(!compBadge) return;
+            if(!monthStr || currentTotal === 0 || historyData.length === 0) { compBadge.classList.add('hidden'); return; }
+            
+            const [y, m] = monthStr.split('-');
+            let prevDate = new Date(y, m - 1); prevDate.setMonth(prevDate.getMonth() - 1);
+            const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+            const prevRecord = historyData.find(d => d.monthStr === prevMonthStr);
+            
+            if(prevRecord && prevRecord.total > 0) {
+                const diff = currentTotal - prevRecord.total; const perc = (diff / prevRecord.total) * 100;
+                compBadge.classList.remove('hidden', 'bg-slate-200', 'text-slate-500', 'bg-rose-100', 'text-rose-600', 'bg-emerald-100', 'text-emerald-600', 'dark:bg-rose-900/30', 'dark:text-rose-400', 'dark:bg-emerald-900/30', 'dark:text-emerald-400');
+                if(perc > 5) {
+                    compBadge.innerHTML = `<i class="fa-solid fa-arrow-up"></i> ${Math.abs(perc).toFixed(1)}%`; compBadge.classList.add('bg-rose-100', 'text-rose-600', 'dark:bg-rose-900/30', 'dark:text-rose-400', 'flex');
+                } else if (perc < -5) {
+                    compBadge.innerHTML = `<i class="fa-solid fa-arrow-down"></i> ${Math.abs(perc).toFixed(1)}%`; compBadge.classList.add('bg-emerald-100', 'text-emerald-600', 'dark:bg-emerald-900/30', 'dark:text-emerald-400', 'flex');
+                } else {
+                    compBadge.innerHTML = `<i class="fa-solid fa-minus"></i> ${Math.abs(perc).toFixed(1)}%`; compBadge.classList.add('bg-slate-200', 'text-slate-500', 'flex');
+                }
+            } else { compBadge.classList.add('hidden'); }
+        }
+
+        // --- Lógica Principal (Cuentas Exactas) ---
+        function calculateTotals() {
+            const vanti = getNumber('valGas'); const internet = getNumber('valInternet'); const agua = getNumber('valAgua');
+            const luz = getNumber('valLuz'); const admin = getNumber('valAdmin'); const sisterAdvance = getNumber('valSister');
+
+            const total = vanti + internet + agua + luz + admin;
+            
+            // Regla: Zulma paga el 50% de los recibos fijos + $65.000 fijos de Luz (si hay registro de luz).
+            const luzZulma = (luz > 0) ? 65000 : 0;
+            const restoGastos = vanti + internet + agua + admin;
+            const shareZulma = (restoGastos / 2) + luzZulma;
+            
+            // Restar el anticipo
+            const balance = sisterAdvance - shareZulma;
+
+            document.getElementById('lblTotal').innerText = formatCurrency(total);
+            document.getElementById('lblShare').innerText = formatCurrency(shareZulma);
+            document.getElementById('lblSisterPaid').innerText = formatCurrency(sisterAdvance);
+
+            const balanceContainer = document.getElementById('balanceContainer');
+            const lblStatus = document.getElementById('lblBalanceStatus');
+            const lblAmount = document.getElementById('lblBalanceAmount');
+            balanceContainer.className = 'p-4 rounded-xl text-center transition-colors shadow-inner';
+            
+            if (total === 0) {
+                lblStatus.innerText = 'Sin Datos'; lblAmount.innerText = '$0';
+                balanceContainer.classList.add('bg-slate-100', 'dark:bg-slate-800'); lblAmount.className = 'text-2xl font-black mt-1 text-slate-500';
+            } else if (balance > 0) {
+                lblStatus.innerText = 'Jorge debe pagar a Zulma'; lblAmount.innerText = formatCurrency(Math.abs(balance));
+                balanceContainer.classList.add('bg-emerald-100', 'dark:bg-emerald-900/30'); lblAmount.className = 'text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400';
+            } else if (balance < 0) {
+                lblStatus.innerText = 'Zulma debe pagar a Jorge'; lblAmount.innerText = formatCurrency(Math.abs(balance));
+                balanceContainer.classList.add('bg-rose-100', 'dark:bg-rose-900/30'); lblAmount.className = 'text-2xl font-black mt-1 text-rose-600 dark:text-rose-400';
+            } else {
+                lblStatus.innerText = 'Cuentas Saldadas'; lblAmount.innerText = '$0';
+                balanceContainer.classList.add('bg-blue-100', 'dark:bg-blue-900/30'); lblAmount.className = 'text-2xl font-black mt-1 text-blue-600 dark:text-blue-400';
+            }
+
+            updateDonutChart(vanti, internet, agua, luz, admin); checkWarnings();
+            const monthInput = document.getElementById('inputMonth').value; updateComparison(total, monthInput);
+
+            return { total, share: shareZulma, sisterAdvance, balanceAmount: Math.abs(balance), balanceStatus: lblStatus.innerText, gas: vanti, internet, agua, luz, admin };
+        }
+
+        const today = new Date(); document.getElementById('inputMonth').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        document.getElementById('chartYearDisplay').innerText = currentChartYear; document.getElementById('inputMonth').addEventListener('change', calculateTotals);
+
+        // --- Gráfica Barras ---
+        function renderChart() {
+            const canvas = document.getElementById('expenseChart'); if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const filteredData = historyData.filter(d => d.monthStr.startsWith(currentChartYear.toString())).sort((a, b) => a.monthStr.localeCompare(b.monthStr));
+            const labels = filteredData.map(d => d.displayMonth);
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#e2e8f0' : '#475569'; const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+            const stackedTotalsPlugin = {
+                id: 'stackedTotals',
+                afterDatasetsDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    chart.data.labels.forEach((label, i) => {
+                        let total = 0; let metaHighest;
+                        chart.data.datasets.forEach((dataset, j) => {
+                            const meta = chart.getDatasetMeta(j);
+                            if (!meta.hidden && dataset.data[i]) { total += dataset.data[i]; metaHighest = meta; }
+                        });
+                        if (total > 0 && metaHighest) {
+                            const bar = metaHighest.data[i];
+                            ctx.save(); ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                            ctx.fillText(formatCurrency(total), bar.x, bar.y - 8); ctx.restore();
+                        }
+                    });
+                }
+            };
+
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Administración', data: filteredData.map(d => d.isLegacy ? 0 : d.admin), backgroundColor: '#a855f7' },
+                        { label: 'Luz', data: filteredData.map(d => d.isLegacy ? 0 : d.luz), backgroundColor: '#eab308' },
+                        { label: 'Agua', data: filteredData.map(d => d.isLegacy ? 0 : d.agua), backgroundColor: '#06b6d4' },
+                        { label: 'Internet', data: filteredData.map(d => d.isLegacy ? 0 : d.internet), backgroundColor: '#3b82f6' },
+                        { label: 'Gas', data: filteredData.map(d => d.isLegacy ? 0 : d.gas), backgroundColor: '#f97316' },
+                        { label: 'Histórico Mensual', data: filteredData.map(d => d.isLegacy ? d.total : 0), backgroundColor: '#94a3b8', hidden: !filteredData.some(d => d.isLegacy) }
+                    ]
+                },
+                plugins: [stackedTotalsPlugin],
+                options: {
+                    layout: { padding: { top: 35 } }, responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: textColor } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + formatCurrency(c.raw); } } }, datalabels: { color: '#ffffff', font: { weight: 'bold', size: 11 }, formatter: (v) => v < 5000 ? '' : formatCurrency(v), display: function(c) { return c.dataset.data[c.dataIndex] > 0; } } },
+                    scales: { y: { stacked: true, beginAtZero: true, ticks: { color: textColor, callback: function(v) { return '$' + v.toLocaleString(); } }, grid: { color: gridColor } }, x: { stacked: true, ticks: { color: textColor }, grid: { display: false } } }
+                }
+            });
+        }
+
+        window.changeYear = function(offset) {
+            currentChartYear += offset; document.querySelectorAll('#chartYearDisplay').forEach(el => el.innerText = currentChartYear);
+            renderChart(); window.playClick();
+        };
+
+        // --- Renderizar Tabla ---
+        function renderTable() {
+            const tbody = document.getElementById('historyTableBody'); const emptyState = document.getElementById('emptyState');
+            if(!tbody || !emptyState) return;
+            tbody.innerHTML = '';
+            
+            if (historyData.length === 0) { emptyState.classList.remove('hidden'); return; }
+            emptyState.classList.add('hidden');
+            const sortedData = [...historyData].sort((a, b) => b.monthStr.localeCompare(a.monthStr));
+
+            sortedData.forEach(record => {
+                const tr = document.createElement('tr'); tr.className = 'border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group';
+                const detailId = `detail-${record.id || record.monthStr}`;
+                const actionBtn = record.isLegacy ? `<span class="text-xs text-slate-400 italic px-1">Sin detalles</span>` : `<button onclick="toggleDetail('${detailId}')" class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 w-8 h-8 rounded-full transition-colors"><i class="fa-solid fa-chevron-down"></i></button>`;
+
+                tr.innerHTML = `<td class="py-3 px-4 font-medium">${record.displayMonth}</td>
+                                <td class="py-3 px-4 font-semibold">${formatCurrency(record.total)}</td>
+                                <td class="py-3 px-4 text-center"><div class="flex items-center justify-center gap-2">${actionBtn}<button onclick="openDeleteModal('${record.id || record.monthStr}')" class="text-slate-400 hover:text-rose-500 transition-colors p-2"><i class="fa-solid fa-trash-can"></i></button></div></td>`;
+                tbody.appendChild(tr);
+
+                if(!record.isLegacy) {
+                    const evHtml = record.evidenceLink ? `<a href="${record.evidenceLink}" target="_blank" class="text-brand-500 hover:text-brand-600 hover:underline mt-3 inline-flex items-center gap-1.5 text-sm font-medium"><i class="fa-solid fa-up-right-from-square"></i> Ver Evidencia</a>` : '';
+                    const trDetail = document.createElement('tr'); trDetail.id = detailId; trDetail.className = 'hidden bg-slate-50 dark:bg-slate-800/30 shadow-inner border-b border-slate-200 dark:border-slate-700';
+                    trDetail.innerHTML = `<td colspan="3" class="px-6 py-4"><div class="flex flex-wrap gap-4 text-sm mb-2">
+                        <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"><span class="text-xs text-orange-500 block mb-1 font-bold"><i class="fa-solid fa-fire mr-1"></i>Gas</span>${formatCurrency(record.gas)}</div>
+                        <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"><span class="text-xs text-blue-500 block mb-1 font-bold"><i class="fa-solid fa-wifi mr-1"></i>Internet</span>${formatCurrency(record.internet)}</div>
+                        <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"><span class="text-xs text-cyan-500 block mb-1 font-bold"><i class="fa-solid fa-droplet mr-1"></i>Agua</span>${formatCurrency(record.agua)}</div>
+                        <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"><span class="text-xs text-yellow-500 block mb-1 font-bold"><i class="fa-solid fa-lightbulb mr-1"></i>Luz</span>${formatCurrency(record.luz)}</div>
+                        <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"><span class="text-xs text-purple-500 block mb-1 font-bold"><i class="fa-solid fa-building mr-1"></i>Admin</span>${formatCurrency(record.admin)}</div>
+                        </div>${evHtml}</td>`;
+                    tbody.appendChild(trDetail);
+                }
+            });
+        }
+        window.toggleDetail = (id) => { const r = document.getElementById(id); if(r) { r.classList.toggle('hidden'); window.playClick(); } };
+
+        // --- Guardado ---
+        document.getElementById('btnClear').addEventListener('click', () => { document.querySelectorAll('.expense-input').forEach(i => i.value = ''); document.getElementById('valEvidence').value = ''; calculateTotals(); window.playClick(); });
+
+        document.getElementById('btnSave').addEventListener('click', async () => {
+            const calc = calculateTotals(); const monthInput = document.getElementById('inputMonth').value; const evLink = document.getElementById('valEvidence').value;
+            if (!monthInput || calc.total <= 0) return;
+
+            const [year, monthNum] = monthInput.split('-'); const dateObj = new Date(year, monthNum - 1);
+            const monthName = dateObj.toLocaleString('es-ES', { month: 'long' }); const displayMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1) + ' ' + year;
+            
+            const newRecord = { monthStr: monthInput, displayMonth: displayMonth, total: calc.total, sisterAdvance: calc.sisterAdvance, balanceAmount: calc.balanceAmount, balanceStatus: calc.balanceStatus, gas: calc.gas, internet: calc.internet, agua: calc.agua, luz: calc.luz, admin: calc.admin, evidenceLink: evLink, isLegacy: false };
+
+            if (isFirebaseActive && userId && db) {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'months', monthInput);
+                await setDoc(docRef, newRecord);
+            } else {
+                newRecord.id = monthInput;
+                const idx = historyData.findIndex(d => d.monthStr === monthInput);
+                if(idx >= 0) historyData[idx] = newRecord; else historyData.push(newRecord);
+                saveToLocal();
+            }
+
+            window.playSuccess(); showToast('Mes guardado exitosamente'); document.getElementById('btnClear').click(); 
+            if(parseInt(year) !== currentChartYear) { currentChartYear = parseInt(year); document.querySelectorAll('#chartYearDisplay').forEach(el => el.innerText = currentChartYear); }
+        });
+
+        window.saveHistorical = async () => {
+            const monthInput = document.getElementById('histMonth').value; const total = getNumber('histTotal'); const sisterAdvance = getNumber('histSister');
+            if (!monthInput || total <= 0) return;
+            const [year, monthNum] = monthInput.split('-'); const dateObj = new Date(year, monthNum - 1); const monthName = dateObj.toLocaleString('es-ES', { month: 'long' });
+            const displayMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1) + ' ' + year;
+
+            const newRecord = { monthStr: monthInput, displayMonth: displayMonth, total: total, sisterAdvance: sisterAdvance, isLegacy: true };
+            
+            if (isFirebaseActive && userId && db) {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'months', monthInput);
+                await setDoc(docRef, newRecord);
+            } else {
+                newRecord.id = monthInput;
+                const idx = historyData.findIndex(d => d.monthStr === monthInput);
+                if(idx >= 0) historyData[idx] = newRecord; else historyData.push(newRecord);
+                saveToLocal();
+            }
+
+            window.closeHistoricalModal(); showToast('Historial guardado'); window.playSuccess();
+            document.getElementById('histMonth').value = ''; document.getElementById('histTotal').value = ''; document.getElementById('histSister').value = '';
+            if(parseInt(year) !== currentChartYear) { currentChartYear = parseInt(year); document.querySelectorAll('#chartYearDisplay').forEach(el => el.innerText = currentChartYear); }
+        };
+
+        // --- Modales ---
+        window.openHistoricalModal = () => { const m = document.getElementById('historicalModal'); m.classList.remove('hidden'); setTimeout(() => { m.classList.remove('opacity-0'); document.getElementById('historicalModalContent').classList.remove('scale-95'); }, 10); window.playClick(); };
+        window.closeHistoricalModal = () => { const m = document.getElementById('historicalModal'); m.classList.add('opacity-0'); document.getElementById('historicalModalContent').classList.add('scale-95'); setTimeout(() => m.classList.add('hidden'), 300); window.playClick(); };
+        window.openDeleteModal = (id) => { recordToDeleteId = id; const m = document.getElementById('deleteModal'); m.classList.remove('hidden'); setTimeout(() => { m.classList.remove('opacity-0'); document.getElementById('deleteModalContent').classList.remove('scale-95'); }, 10); window.playClick(); };
+        window.closeDeleteModal = () => { const m = document.getElementById('deleteModal'); m.classList.add('opacity-0'); document.getElementById('deleteModalContent').classList.add('scale-95'); setTimeout(() => m.classList.add('hidden'), 300); window.playClick(); };
+        
+        window.confirmDelete = async () => {
+            if(!recordToDeleteId) return;
+            if (isFirebaseActive && userId && db) {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'months', recordToDeleteId);
+                await deleteDoc(docRef);
+            } else {
+                historyData = historyData.filter(d => d.id !== recordToDeleteId && d.monthStr !== recordToDeleteId);
+                saveToLocal();
+            }
+            window.closeDeleteModal(); showToast('Registro eliminado'); window.playClick();
+        };
+
+        // --- Modo Oscuro ---
+        const themeToggleBtn = document.getElementById('themeToggle'); const themeIcon = document.getElementById('themeIcon');
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { document.documentElement.classList.add('dark'); themeIcon.classList.replace('fa-moon', 'fa-sun'); }
+        themeToggleBtn.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            themeIcon.classList.replace(document.documentElement.classList.contains('dark') ? 'fa-moon' : 'fa-sun', document.documentElement.classList.contains('dark') ? 'fa-sun' : 'fa-moon');
+            renderChart(); window.playClick();
+        });
+    </script>
+</body>
+</html>
